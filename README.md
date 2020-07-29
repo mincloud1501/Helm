@@ -2,15 +2,12 @@
 
 Kubernetes를 위한 Package Manager인 Helm의 개념 파악 및 실습을 통한 연구 [![Sources](https://img.shields.io/badge/출처-Helm-yellow)](https://docs.helm.sh/)
 
-## Architecture [![Sources](https://img.shields.io/badge/출처-programmer.help-yellow)](https://programmer.help/blogs/helm-for-k8s-quick-download-yaml-file-template.html)
+[![Video Label](images/introduction.png)](https://www.youtube.com/watch?v=fy8SHvNZGeE)
+
+### Architecture [![Sources](https://img.shields.io/badge/출처-programmer.help-yellow)](https://programmer.help/blogs/helm-for-k8s-quick-download-yaml-file-template.html)
 
 - helm이란 k8s를 package로 관리해 주는 툴로 일종의 Python에서 package를 관리하는 pip 또는 Node.js에서의 npm 역할과 유사 개념
 - `helm chart`는 helm의 package format으로 k8s를 설명하는 파일들의 집합
-	- Chart.yaml : 해당 helm chart에 대한 정보 포함
-	- values.yaml : 해당 helm chart에서 사용하는 가종 값들에 대한 정의
-	- chart directory : 의존하는 chart에 대한 정보
-	- template : k8s를 정의하는 menifest file이 정의되어 있는 folder
-	- README.md : 사용자가 읽을 수 있는 README file
 - repository : chart들이 공유되는 공간으로 일종의 docker hub와 같은 개념
 - release : k8s 환경에서 동작되는 서비들의 release version
 
@@ -23,9 +20,32 @@ Kubernetes를 위한 Package Manager인 Helm의 개념 파악 및 실습을 통�
 - Installing and configuring Helm
 
 ※ 본 실습에서는 GKE를 사용하여 설치 및 실습을 진행합니다.
+
 ※ GKE에 대한 자세한 설명은 저의 또 다른 게시물을 참고하세요 (https://github.com/mincloud1501/MSA_miniProject)
 
+※ 이번 실습에서 알아볼 명령 셋은 아래와 같습니다. 우선 기존 생성되어 있는 chart를 repository에서 가져와 설치/업그레이드/배포해 봅니다.
+
+```bash
+-----------------------------------------------------------------------------------
+repository                      | chart
+-----------------------------------------------------------------------------------
+helm repo list                  | helm search <keyword>
+helm repo add <repo name> <url> | helm inspect [chart/values/README] <chart>
+helm repo remove <name>         | helm install [-f <config path>] <chart>
+helm repo update                | helm ls
+								| helm status <release name>
+								| helm get [values/manifest] <release name>
+								| helm upgrade [-f <config path>] <release> <chart>
+								| helm history <release>
+								| helm rollback <release> <revision no>
+								| helm delete <release name> [--purge]
+------------------------------------------------------------------------------------
+```
+
 ### Initialize a Helm Chart Repository
+
+- helm chart repository 목록을 확인하고 새로운 repository를 등록한다. Google helm chart를 가장 많이 사용한다. (https://github.com/helm/charts)
+- stable repository는 helm 설치 시 기본으로 등록된다.
 
 ```bash
 mincloud1501@cloudshell:~ (zipkin-proxy)$ helm repo add stable https://kubernetes-charts.storage.googleapis.com/
@@ -44,6 +64,11 @@ stable/artifactory                      7.3.1           6.1.0                   
 stable/artifactory-ha                   0.4.1           6.2.0                   DEPRECATED Universal Repository Manager support...
 stable/atlantis                         3.12.2          v0.14.0                 A Helm chart for Atlantis https://www.runatlant...
 # ... and many more
+
+mincloud1501@cloudshell:~ (zipkin-proxy)$ helm repo list
+NAME    URL
+stable  https://kubernetes-charts.storage.googleapis.com/
+
 
 ```
 
@@ -67,10 +92,27 @@ NOTES:
 MySQL can be accessed via port 3306 on the following DNS name from within your cluster:
 mysql-1595924649.default.svc.cluster.local
 
+To get your root password run:
+    MYSQL_ROOT_PASSWORD=$(kubectl get secret --namespace default mysql-1595924649 -o jsonpath="{.data.mysql-root-password}" | base64 --decode; echo)
+To connect to your database:
+1. Run an Ubuntu pod that you can use as a client:
+    kubectl run -i --tty ubuntu --image=ubuntu:16.04 --restart=Never -- bash -il
+2. Install the mysql client:
+    $ apt-get update && apt-get install mysql-client -y
+3. Connect using the mysql cli, then provide your password:
+    $ mysql -h mysql-1595924649 -p
+To connect to your database directly from outside the K8s cluster:
+    MYSQL_HOST=127.0.0.1
+    MYSQL_PORT=3306
+    # Execute the following command to route the connection:
+    kubectl port-forward svc/mysql-1595924649 7000:3306
+    mysql -h ${MYSQL_HOST} -P${MYSQL_PORT} -u root -p${MYSQL_ROOT_PASSWORD}
+
 mincloud1501@cloudshell:~ (zipkin-proxy)$ helm ls
 NAME                    NAMESPACE       REVISION        UPDATED                                 STATUS          CHART           APP VERSION
 mysql-1595924649        default         1               2020-07-28 08:24:16.120852005 +0000 UTC deployed        mysql-1.6.6     5.7.30
 
+# Helm으로 배포된 application의 Pod를 k8s에서 확인할 수 있다.
 mincloud1501@cloudshell:~ (zipkin-proxy)$ kubectl get pod --all-namespaces
 NAMESPACE      NAME                                                        READY   STATUS      RESTARTS   AGE
 default        mysql-1595924649-6d9c8f6c78-tjs6l                           1/1     Running     0          4m5s
@@ -79,3 +121,199 @@ mincloud1501@cloudshell:~ (zipkin-proxy)$ kubectl get svc
 NAME                 TYPE           CLUSTER-IP    EXTERNAL-IP   PORT(S)        AGE
 mysql-1595924649     ClusterIP      10.8.15.185   <none>        3306/TCP       5m23s
 ```
+
+- helm으로 설치한 k8s mysql에 접속하려면, root pwd를 받아와야 한다.
+
+```bash
+mincloud1501@cloudshell:~ (zipkin-proxy)$ MYSQL_ROOT_PASSWORD=$(kubectl get secret --namespace default mysql-1595924649 -o jsonpath="{.data.mysql-root-password}" | base64 --decode; echo)
+
+mincloud1501@cloudshell:~ (zipkin-proxy)$ echo $MYSQL_ROOT_PASSWORD
+oj1WhOy4qo
+```
+
+- k8s mysql에 접속하기 위해 port-forwarding을 해줘야 한다. Local PC의 7000번 port를 3006 port로 포워딩 후, mysql에 접속한다.
+
+```bash
+mincloud1501@cloudshell:~ (zipkin-proxy)$ kubectl port-forward svc/mysql-1595924649 7000:3306
+Forwarding from 127.0.0.1:7000 -> 3306
+
+mincloud1501@cloudshell:~ (zipkin-proxy)$ mysql -h 127.0.0.1 -P 7000 -u root -p
+Enter password:
+Welcome to the MySQL monitor.  Commands end with ; or \g.
+Your MySQL connection id is 303
+Server version: 5.7.30 MySQL Community Server (GPL)
+
+Copyright (c) 2000, 2020, Oracle and/or its affiliates. All rights reserved.
+
+Oracle is a registered trademark of Oracle Corporation and/or its
+affiliates. Other names may be trademarks of their respective
+owners.
+
+Type 'help;' or '\h' for help. Type '\c' to clear the current input statement.
+
+mysql> quit
+```
+
+- 위와 같이 mysql에 접속하면, 이전 터미널에서 connection 정보를 확인할 수 있다.
+
+```bash
+mincloud1501@cloudshell:~ (zipkin-proxy)$ kubectl port-forward svc/mysql-1595924649 7000:3306
+Forwarding from 127.0.0.1:7000 -> 3306
+
+Handling connection for 7000
+```
+
+### Uninstall a Release
+
+```bash
+mincloud1501@cloudshell:~ (zipkin-proxy)$ helm uninstall mysql-1595924649
+release "mysql-1595924649" uninstalled
+
+mincloud1501@cloudshell:~ (zipkin-proxy)$ helm status mysql-1595924649
+Status: UNINSTALLED
+```
+
+---
+
+## Create Helm Chart
+
+- 이번 실습에서는 직접 heml chart를 생성하여 repository에 배포하는 방법에 대해 알아본다.
+
+※ chart에 대한 상세 Docs는 https://docs.helm.sh/docs/topics/charts/ 를 참조한다.
+
+```bash
+----------------------------------------------------------------------------
+create | test | packaging
+----------------------------------------------------------------------------
+helm create <chart name>
+
+helm lint <chart.yaml directory>
+helm template <chart.yaml directory>
+helm install <chart.yaml directory> --name <release name> --debug --dry-run
+
+helm package <chart.yaml directory>
+----------------------------------------------------------------------------
+```
+
+#### [Step.1] helm create
+
+- `charts/` : 해당 directory에 종속성을 가지고 있는 helm chart를 저장한다. 만약 웹서비스를 실행하는 helm chart에서 설치 시 mysql helm chart가 필요하면 별도의 dependency 설정을 진행하고, 해당 directory의 helm chart를 호출하게 된다.
+- `templates/` : 실제 배포에 필요한 yaml 파일이 저장. 각 yaml 파일은 template화되어 지정한 변수에 따라서 release를 생성할 수 있도록 재사용성을 제공한다.
+- `deployment.yaml` : k8s deployment 형태로 배포되기 위해 사용되는 yaml 파일
+- `ingress.yaml` : k8s ingress 형태로 배포되기 위해 사용되는 yaml 파일
+- `service.yaml` : k8s service 형태로 배포되기 위해 사용되는 yaml 파일
+- `NOTES.txt` : 배포 후 사용자에게 제공되는 사용법이나, 구조 등이 설명되어 있는 txt파일.
+- `values.yaml` : template화 되어 있는 chart의 변수(dafault)를 정의한다.
+- `Chart.yaml` : Chart에 대한 정보가 포함되어 있는 yaml 파일
+- `README.md`
+
+```bash
+mincloud1501@cloudshell:~ (zipkin-proxy)$ helm create test-chart
+Creating test-chart
+
+mincloud1501@cloudshell:~ (zipkin-proxy)$ tree test-chart
+test-chart
+├── charts
+├── Chart.yaml
+├── templates
+│   ├── deployment.yaml
+│   ├── _helpers.tpl
+│   ├── hpa.yaml
+│   ├── ingress.yaml
+│   ├── NOTES.txt
+│   ├── serviceaccount.yaml
+│   ├── service.yaml
+│   └── tests
+│       └── test-connection.yaml
+└── values.yaml
+3 directories, 10 files
+```
+
+#### [Step.2] Install helm chart
+
+- 생성한 Chart를 test-chart-release 명으로 설치하고, 배포된 release 정보를 확인한다.
+
+```bash
+mincloud1501@cloudshell:~/test-chart (zipkin-proxy)$ helm install . --generate-name
+NAME: chart-1596001191
+LAST DEPLOYED: Wed Jul 29 05:39:56 2020
+NAMESPACE: default
+STATUS: deployed
+REVISION: 1
+NOTES:
+1. Get the application URL by running these commands:
+  export POD_NAME=$(kubectl get pods --namespace default -l "app.kubernetes.io/name=test-chart,app.kubernetes.io/instance=chart-1596001191" -o jsonpath="{.items[0].metadata.name}")
+  echo "Visit http://127.0.0.1:8080 to use your application"
+  kubectl --namespace default port-forward $POD_NAME 8080:80
+
+mincloud1501@cloudshell:~/test-chart (zipkin-proxy)$ helm ls
+NAME                    NAMESPACE       REVISION        UPDATED                                 STATUS          CHART                   APP VERSION
+chart-1596001191        default         1               2020-07-29 05:39:56.426717706 +0000 UTC deployed        test-chart-0.1.0        1.16.0  
+```
+
+#### [Step.3] Helm Upgrad / RollOut
+
+- 배포된 Release의 변경사항이 있거나, 문제가 생긴 version에 대하여 이전 version 또는 지정한 version으로 돌릴수 있다.
+- 기본적으로 배포된 pod는 1개로 values.yaml에서 replicaCount가 1로 정의되어 있기 때문에 1개의 Pod를 확인할 수 있다.
+
+```bash
+mincloud1501@cloudshell:~/test-chart (zipkin-proxy)$ kubectl get pod
+NAME                                           READY   STATUS    RESTARTS   AGE
+chart-1596001191-test-chart-7b8cb77597-rc496   1/1     Running   0          3m53s
+```
+
+[values.yaml]
+
+```bash
+replicaCount: 2
+```
+
+[Chart.yaml]
+
+```bash
+version: 0.2.0
+```
+
+- replicaCount를 2로, chart의 version을 0.2.0으로 수정한 후, 변경한 chart로 upgrade시 2개의 Pod가 실행된다.
+
+```bash
+mincloud1501@cloudshell:~/test-chart (zipkin-proxy)$ helm upgrade chart-1596001191 .
+Release "chart-1596001191" has been upgraded. Happy Helming!
+NAME: chart-1596001191
+LAST DEPLOYED: Wed Jul 29 05:49:04 2020
+NAMESPACE: default
+STATUS: deployed
+REVISION: 2
+NOTES:
+1. Get the application URL by running these commands:
+  export POD_NAME=$(kubectl get pods --namespace default -l "app.kubernetes.io/name=test-chart,app.kubernetes.io/instance=chart-1596001191" -o jsonpath="{.items[0].metadata.name}")
+  echo "Visit http://127.0.0.1:8080 to use your application"
+  kubectl --namespace default port-forward $POD_NAME 8080:80
+
+# Chart의 version과 Revision이 증가된 것을 확인할 수 있다.
+mincloud1501@cloudshell:~/test-chart (zipkin-proxy)$ kubectl get pod
+NAME                                           READY   STATUS    RESTARTS   AGE
+chart-1596001191-test-chart-7b8cb77597-cvsjd   1/1     Running   0          15s
+chart-1596001191-test-chart-7b8cb77597-rc496   1/1     Running   0          9m20s
+
+# 이전  Revision 번호에 따른 정보를 확인할 수 있다.
+mincloud1501@cloudshell:~/test-chart (zipkin-proxy)$ helm history chart-1596001191
+REVISION        UPDATED                         STATUS          CHART                   APP VERSION     DESCRIPTION
+1               Wed Jul 29 05:39:56 2020        superseded      test-chart-0.1.0        1.16.0          Install complete
+2               Wed Jul 29 05:49:04 2020        deployed        test-chart-0.2.0        1.16.0          Upgrade complete
+
+# 새로 배포된 Release에 문제가 생겨서 이전 버전으로 되돌아 가려면, rollback 명령을 실행하여 돌아갈 수 있다.
+mincloud1501@cloudshell:~/test-chart (zipkin-proxy)$ helm rollback chart-1596001191 1
+Rollback was a success! Happy Helming!
+
+mincloud1501@cloudshell:~/test-chart (zipkin-proxy)$ kubectl get pod
+NAME                                           READY   STATUS        RESTARTS   AGE
+chart-1596001191-test-chart-7b8cb77597-cvsjd   0/1     Terminating   0          4m3s
+chart-1596001191-test-chart-7b8cb77597-rc496   1/1     Running       0          13m
+```
+
+![charttest](images/charttest.png)
+
+---
+
+## Chartmuseum을 이용한 Private Helm Chart Repository
