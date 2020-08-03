@@ -6,10 +6,11 @@ Kubernetes를 위한 Package Manager인 Helm의 개념 파악 및 실습을 통�
 
 ### Architecture [![Sources](https://img.shields.io/badge/출처-programmer.help-yellow)](https://programmer.help/blogs/helm-for-k8s-quick-download-yaml-file-template.html)
 
-- helm이란 k8s를 package로 관리해 주는 툴로 일종의 Python에서 package를 관리하는 pip 또는 Node.js에서의 npm 역할과 유사 개념
-- `helm chart`는 helm의 package format으로 k8s를 설명하는 파일들의 집합
-- repository : chart들이 공유되는 공간으로 일종의 docker hub와 같은 개념
-- release : k8s 환경에서 동작되는 서비들의 release version
+- Helm이란 k8s를 package로 관리해 주는 툴로 일종의 Python에서 package를 관리하는 pip 또는 Node.js에서의 npm 역할과 유사 개념
+	- `helm chart`는 helm의 package format으로 k8s를 설명하는 파일들의 집합
+	- repository : chart들이 공유되는 공간으로 일종의 docker hub와 같은 개념
+	- release : k8s 환경에서 동작되는 서비들의 release version
+- Helm은 k8s를 사용할때, 같이 많이 사용되는 solution이고 특히 k8s에 application 설정 및 배포 관점에서 매우 유용하다. 물론 전체 CI/CD pipeline을 모두 만들 수는 없지만, Spinnaker나 Jenkins X 등의 tool과 함께 전체 CI/CD pipeline의 중요한 요소로서 사용된다.
 
 ![architecture](images/architecture.jpg)
 
@@ -68,8 +69,6 @@ stable/atlantis                         3.12.2          v0.14.0                 
 mincloud1501@cloudshell:~ (zipkin-proxy)$ helm repo list
 NAME    URL
 stable  https://kubernetes-charts.storage.googleapis.com/
-
-
 ```
 
 ### Install an Example Chart
@@ -183,7 +182,7 @@ Status: UNINSTALLED
 
 ```bash
 ----------------------------------------------------------------------------
-create | test | packaging
+create >> test >> packaging
 ----------------------------------------------------------------------------
 helm create <chart name>
 
@@ -199,12 +198,12 @@ helm package <chart.yaml directory>
 
 - `charts/` : 해당 directory에 종속성을 가지고 있는 helm chart를 저장한다. 만약 웹서비스를 실행하는 helm chart에서 설치 시 mysql helm chart가 필요하면 별도의 dependency 설정을 진행하고, 해당 directory의 helm chart를 호출하게 된다.
 - `templates/` : 실제 배포에 필요한 yaml 파일이 저장. 각 yaml 파일은 template화되어 지정한 변수에 따라서 release를 생성할 수 있도록 재사용성을 제공한다.
-- `deployment.yaml` : k8s deployment 형태로 배포되기 위해 사용되는 yaml 파일
-- `ingress.yaml` : k8s ingress 형태로 배포되기 위해 사용되는 yaml 파일
-- `service.yaml` : k8s service 형태로 배포되기 위해 사용되는 yaml 파일
+- `deployment.yaml` : k8s deployment 형태로 배포되기 위해 사용되는 yaml 파일.
+- `ingress.yaml` : k8s ingress 형태로 배포되기 위해 사용되는 yaml 파일.
+- `service.yaml` : k8s service 형태로 배포되기 위해 사용되는 yaml 파일.
 - `NOTES.txt` : 배포 후 사용자에게 제공되는 사용법이나, 구조 등이 설명되어 있는 txt파일.
 - `values.yaml` : template화 되어 있는 chart의 변수(dafault)를 정의한다.
-- `Chart.yaml` : Chart에 대한 정보가 포함되어 있는 yaml 파일
+- `Chart.yaml` : Chart에 대한 정보가 포함되어 있는 yaml 파일.
 - `README.md`
 
 ```bash
@@ -253,7 +252,7 @@ chart-1596001191        default         1               2020-07-29 05:39:56.4267
 
 #### [Step.3] Helm Upgrad / RollOut
 
-- 배포된 Release의 변경사항이 있거나, 문제가 생긴 version에 대하여 이전 version 또는 지정한 version으로 돌릴수 있다.
+- 배포된 Release의 변경사항이 있거나, 문제가 생긴 version에 대하여 이전 version 또는 지정한 version으로 돌릴 수 있다.
 - 기본적으로 배포된 pod는 1개로 values.yaml에서 replicaCount가 1로 정의되어 있기 때문에 1개의 Pod를 확인할 수 있다.
 
 ```bash
@@ -283,7 +282,7 @@ NAME: chart-1596001191
 LAST DEPLOYED: Wed Jul 29 05:49:04 2020
 NAMESPACE: default
 STATUS: deployed
-REVISION: 2
+REVISION: 2  # <== 2개로 변경되었음을 확인할 수 있다.
 NOTES:
 1. Get the application URL by running these commands:
   export POD_NAME=$(kubectl get pods --namespace default -l "app.kubernetes.io/name=test-chart,app.kubernetes.io/instance=chart-1596001191" -o jsonpath="{.items[0].metadata.name}")
@@ -296,7 +295,7 @@ NAME                                           READY   STATUS    RESTARTS   AGE
 chart-1596001191-test-chart-7b8cb77597-cvsjd   1/1     Running   0          15s
 chart-1596001191-test-chart-7b8cb77597-rc496   1/1     Running   0          9m20s
 
-# 이전  Revision 번호에 따른 정보를 확인할 수 있다.
+# 이전 Revision 번호에 따른 정보를 확인할 수 있다.
 mincloud1501@cloudshell:~/test-chart (zipkin-proxy)$ helm history chart-1596001191
 REVISION        UPDATED                         STATUS          CHART                   APP VERSION     DESCRIPTION
 1               Wed Jul 29 05:39:56 2020        superseded      test-chart-0.1.0        1.16.0          Install complete
@@ -316,4 +315,96 @@ chart-1596001191-test-chart-7b8cb77597-rc496   1/1     Running       0          
 
 ---
 
-## Chartmuseum을 이용한 Private Helm Chart Repository
+## Chartmuseum을 이용한 Private Helm Chart Repository [![Sources](https://img.shields.io/badge/출처-chartmuseum-yellow)](https://chartmuseum.com)
+
+```bash
+ChartMuseum is an open-source Helm Chart Repository written in Go (Golang), with support for cloud storage backends, including Google Cloud Storage, Amazon S3, Microsoft Azure Blob Storage, Alibaba Cloud OSS Storage and Openstack Object Storage.
+```
+
+- Chartmusem은 오픈소스 Helm Chart Repository Server로 인증 기능 뿐만 아니라 File Storage로 AWS S3, Google GCS 등을 backend로 사용할 수 있다.
+- Chartmuseum은 다양한 Platform에서 제공되는 Helm Chart Repository로 쉽게 설치 조작이 가능하다.
+- Docker Container를 이용하여 실행시킬 수 있으며, 기본적으로 8080 port로 Listening 되어 있다.
+- Chart가 실제로 저장될 Persistent Volumes Directory로 `/data` directory를 생성하여 사용한다.
+
+#### [Step.0] Installation (https://github.com/helm/chartmuseum)
+
+- File을 download 후 실행권한을 주고 실행경로에 옮긴다.
+
+```bash
+# on Linux Manually Installation
+mincloud1501@cloudshell:~/test-chart (zipkin-proxy)$ curl -LO https://s3.amazonaws.com/chartmuseum/release/latest/bin/linux/amd64/chartmuseum
+mincloud1501@cloudshell:~/test-chart (zipkin-proxy)$ chmod +x ./chartmuseum
+mincloud1501@cloudshell:~/test-chart (zipkin-proxy)$ sudo mv ./chartmuseum /usr/local/bin
+
+mincloud1501@cloudshell:~/test-chart (zipkin-proxy)$ chartmuseum --version
+ChartMuseum version 0.12.0 (build 101e26a)
+```
+
+- chart의 정보는 api를 통하여 확인할 수 있는데, 처음에는 등록한 Chart가 없기때문에 정보를 확인할 수 없다.
+
+```bash
+# local에서 chartmuseum을 test해 보기 위해, 한 개의 Shell에서 chartmuseum을 아래와 같이 실행하면 running 상태로 실행된다.
+mincloud1501@cloudshell:~ (zipkin-proxy)$ chartmuseum --debug --port=8080 --storage="local" --storage-local-rootdir="./chartstorage"
+
+2020-08-03T01:52:06.089Z        DEBUG   Fetching chart list from storage        {"repo": ""}
+2020-08-03T01:52:06.089Z        DEBUG   No change detected between cache and storage    {"repo": ""}
+2020-08-03T01:52:06.090Z        INFO    Starting ChartMuseum    {"port": 8080}
+
+# 다른 Shell에서 현재의 chart내 내용을 확인해 보면 추가 등록한 내용이 없기 때문에 공란으로 표기된다.
+mincloud1501@cloudshell:~ (zipkin-proxy)$ curl http://localhost:8080/api/charts
+{}
+```
+
+#### [Step.1] Packaging
+
+- 앞서 생성했던 test-chart으로 파일을 배포하기 위해서는 chart file을 `*.tgz` 파일 형태로 packaging해야 하는데 `helm package [PACKAGE DIRECTORY]`를 사용하여 Packaging한다.
+
+```bash
+mincloud1501@cloudshell:~ (zipkin-proxy)$ helm package ./test-chart
+Successfully packaged chart and saved it to: /home/mincloud1501/test-chart-0.2.0.tgz
+```
+
+- 만약 packaged file에 대한 무결성을 보장하기 위해서 package file에 key로 signing 하는 방법이 있다. `helm package --sign`을 이용해서 signing 한다.
+- package에 signing을 하면 `*.prov 파일 (provenance file)`이 생성되고, chart package를 설치할 때 `helm install --verify`을 이용하면 이 provenance 파일을 이용해서 package의 무결성을 확인한 후, 변조되지 않은 경우에만 설치를 진행한다.
+
+- curl을 통해 Packaging 되어 있는 Chart Package를 Chartmuseum에 등록한 후, API를 호출하여 등록된 Chart를 확인해 본다.
+
+```bash
+mincloud1501@cloudshell:~/test-chart (zipkin-proxy)$ curl --data-binary "@test-chart-0.2.0.tgz" http://localhost:8080/api/charts
+{"saved":true}
+
+# 다시 차트목록을 확인하면 등록한 차트가 나오는걸 확인할 수 있다.
+mincloud1501@cloudshell:~/test-chart (zipkin-proxy)$ curl http://localhost:8080/api/charts
+{"test-chart":[{"name":"test-chart","version":"0.2.0","description":"A Helm chart for Kubernetes","apiVersion":"v2","appVersion":"1.16.0","type":"application","urls":["charts/test-chart-0.2.0.tgz"],"created":"2020-08-03T01:54:53.237775625Z","digest":"d615fbebaea0a877902bc669df9203a9fabdece62178fa74d461855969cfe108"}]}
+```
+
+#### [Step.2] Chartmuseum을 이용한 Chart 설치
+
+- Chartmuseum으로 실행한 Chart Repository를 이용해서 test-chart를 설치하기 위해 `helm repo add` 명령으로 chartmuseum을 새로운 helm repository로 추가해 준다.
+- `helm search repo`를 통해서 저장소가 제대로 등록됐는지 확인하고, 이 chart 설치는 `helm install chartmuseum/test-chart` 명령을 통해서 설치할 수 있다.
+
+```bash
+mincloud1501@cloudshell:~/test-chart (zipkin-proxy)$ helm repo add chartmuseum http://localhost:8080
+"chartmuseum" has been added to your repositories
+
+
+mincloud1501@cloudshell:~/test-chart (zipkin-proxy)$ helm search repo chartmuseum
+NAME                    CHART VERSION   APP VERSION     DESCRIPTION
+stable/chartmuseum      2.13.1          0.12.0          Host your own Helm Chart Repository
+chartmuseum/test-chart  0.2.0           1.16.0          A Helm chart for Kubernetes
+
+
+mincloud1501@cloudshell:~/test-chart (zipkin-proxy)$ helm install chartmuseum/test-chart --generate-name
+NAME: test-chart-1596420245
+LAST DEPLOYED: Mon Aug  3 02:04:10 2020
+NAMESPACE: default
+STATUS: deployed
+REVISION: 1
+NOTES:
+1. Get the application URL by running these commands:
+  export POD_NAME=$(kubectl get pods --namespace default -l "app.kubernetes.io/name=test-chart,app.kubernetes.io/instance=test-chart-1596420245" -o jsonpath="{.items[0].metadata.name}")
+  echo "Visit http://127.0.0.1:8080 to use your application"
+  kubectl --namespace default port-forward $POD_NAME 8080:80
+```
+
+![chartmuseum](images/chartmuseum.png)
