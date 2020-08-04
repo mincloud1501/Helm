@@ -228,6 +228,19 @@ test-chart
 3 directories, 10 files
 ```
 
+![template](images/template.png)
+
+- helm chart가 작성되면 제대로 작동하는지 검증을 해볼 수 있다. 해당 chart directory에서 `helm lint` 명령을 사용하여 문법적인 오류가 없는지 확인한다.
+
+```bash
+mincloud1501@cloudshell:~/test-chart (zipkin-proxy)$ helm lint .
+
+==> Linting .
+[INFO] Chart.yaml: icon is recommended
+[ERROR] templates/: error unpacking -p in test-chart: validation: chart.metadata is required
+Error: 1 chart(s) linted, 1 chart(s) failed
+```
+
 #### [Step.2] Install helm chart
 
 - 생성한 Chart를 test-chart-release 명으로 설치하고, 배포된 release 정보를 확인한다.
@@ -250,7 +263,7 @@ NAME                    NAMESPACE       REVISION        UPDATED                 
 chart-1596001191        default         1               2020-07-29 05:39:56.426717706 +0000 UTC deployed        test-chart-0.1.0        1.16.0  
 ```
 
-#### [Step.3] Helm Upgrad / RollOut
+#### [Step.3] Helm Upgrad & RollOut
 
 - 배포된 Release의 변경사항이 있거나, 문제가 생긴 version에 대하여 이전 version 또는 지정한 version으로 돌릴 수 있다.
 - 기본적으로 배포된 pod는 1개로 values.yaml에서 replicaCount가 1로 정의되어 있기 때문에 1개의 Pod를 확인할 수 있다.
@@ -374,7 +387,12 @@ tests:
 mincloud1501@cloudshell:~ (zipkin-proxy)$ echo '{mariadbUser: mincloud, mariadbDatabase: minclouddb}' > config.yaml
 ```
 
-- 생성한 `config.yaml`로 install 한다.
+- Value값을 values,yaml에 정의했지만 설치에 따라서 각 값을 변경하고 싶은 경우에는 values.yaml 파일을 하나하나 편집해야 하는 불편함이 있다.
+- 즉, chart를 repository에 등록된 chart 압축 파일을 download 후에 압축을 풀고, 내용을 수정하고 설치에 사용해야 하는 불편함이 있다.
+- 이를 helm install 또는 upgrade시에  `--set` 옵션을 사용하면 쉽게 변경이 가능하다.
+- 그러나 보통 변경되는 parameter가 많을 경우, `helm install -f` 옵션을 사용하여 value file을 지정하여 사용한다.
+- 아래와 같이 생성한 `config.yaml`로 install 한다.
+
 
 ```bash
 mincloud1501@cloudshell:~ (zipkin-proxy)$ helm install -f config.yaml stable/mariadb --generate-name
@@ -392,8 +410,9 @@ mariadb-1596502752      default         1               2020-08-04 00:59:18.9137
 
 ## Chart Upgrade & Rollback
 
-- chart의 신규 version이 있거나, 이미 release한 chart의 설정값을 변경하고자 할 때는 `helm upgrade` 명령으로 수행 가능하다.
-- 
+
+- chart의 신규 version이 있거나, 이미 release한 chart의 설정값을 변경하고자 할 때는 `helm upgrade` 명령으로 수행 가능.
+
 
 [upgrade.yaml]
 
@@ -523,3 +542,27 @@ NOTES:
 ```
 
 ![chartmuseum](images/chartmuseum.png)
+
+---
+
+## Chart Hooks [![Sources](https://img.shields.io/badge/출처-Helm-yellow)](https://helm.sh/docs/topics/charts_hooks/)
+
+- Helm은 chart 개발자가 다음과 같은 경우에 개입할 수 있는 hook mechanism을 제공한다. release life cycle의 특정 시점에 hook를 사용하여 다음을 수행할 수 있다.
+	- 다른 chart를 load하기 전에, 설치를 진행하는 중에 ConfigMap 또는 Secret를 load
+	- 새 chart를 설치하기 전에 작업을 실행하여 db를 백업한 다음, data를 복원하기 위해 upgrade 후 두 번째 작업을 실행
+	- service를 정상적으로 제거하기 전, release를 삭제하기 전에 job을 실행.
+- hook는 일반 template처럼 작동하지만, 다른 방식으로 활용할 수 있도록 특별한 `annotation`을 가지고 있다.
+
+[Annotation Value]
+
+- pre-install: resource를 설치하기 전 template이 렌더링 된 후에 실행된다.
+- post-install: chart에 의해서 resource들이 모두 설치된 후에 실행된다.
+- pre-delete: k8s에서 resource가 삭제되기 전에 실행된다.
+- post-delete: release의 resource를 모두 삭제한 후에 실행된다.  
+- pre-upgrade: resource가 update되기 전 template이 렌더링된 후에 실행된다.
+- post-upgrade: 모든 resource가 upgrade된 후에 upgrade가 실행된다. 
+- pre-rollback: resource가 rollback되기 전 template가 렌더링 된 후에 rollback request가 실행된다.
+- post-rollback: 모든 resource가 수정된 후에 rollback request가 실행된다.
+- test: 'helm test' 명령을 실행할 때 수행된다.
+
+TBD...
