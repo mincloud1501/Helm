@@ -4,7 +4,7 @@ Kubernetes를 위한 Package Manager인 Helm의 개념 파악 및 실습을 통�
 
 [![Video Label](images/introduction.png)](https://www.youtube.com/watch?v=fy8SHvNZGeE)
 
-### Architecture [![Sources](https://img.shields.io/badge/출처-programmer.help-yellow)](https://programmer.help/blogs/helm-for-k8s-quick-download-yaml-file-template.html)
+### Architecture [![Sources](https://img.shields.io/badge/출처-phico.io-yellow)](http://phico.io/post/helm/)
 
 - Helm이란 k8s를 package로 관리해 주는 툴로 일종의 Python에서 package를 관리하는 pip 또는 Node.js에서의 npm 역할과 유사 개념
 	- `helm chart`는 helm의 package format으로 k8s를 설명하는 파일들의 집합
@@ -12,7 +12,7 @@ Kubernetes를 위한 Package Manager인 Helm의 개념 파악 및 실습을 통�
 	- release : k8s 환경에서 동작되는 서비들의 release version
 - Helm은 k8s를 사용할때, 같이 많이 사용되는 solution이고 특히 k8s에 application 설정 및 배포 관점에서 매우 유용하다. 물론 전체 CI/CD pipeline을 모두 만들 수는 없지만, Spinnaker나 Jenkins X 등의 tool과 함께 전체 CI/CD pipeline의 중요한 요소로서 사용된다.
 
-![architecture](images/architecture.jpg)
+![architecture](images/architecture.png)
 
 ### Prerequisites
 
@@ -30,16 +30,16 @@ Kubernetes를 위한 Package Manager인 Helm의 개념 파악 및 실습을 통�
 -----------------------------------------------------------------------------------
 repository                      | chart
 -----------------------------------------------------------------------------------
-helm repo list                  | helm search <keyword>
+helm repo list                  | helm search [repo/hub] <keyword>
 helm repo add <repo name> <url> | helm inspect [chart/values/README] <chart>
 helm repo remove <name>         | helm install [-f <config path>] <chart>
 helm repo update                | helm ls
-								| helm status <release name>
-								| helm get [values/manifest] <release name>
-								| helm upgrade [-f <config path>] <release> <chart>
-								| helm history <release>
-								| helm rollback <release> <revision no>
-								| helm delete <release name> [--purge]
+-                               | helm status <release name>
+-                               | helm get [values/manifest] <release name>
+-                               | helm upgrade [-f <config path>] <release> <chart>
+-                               | helm history <release>
+-                               | helm rollback <release> <revision no>
+-                               | helm delete <release name> [--purge]
 ------------------------------------------------------------------------------------
 ```
 
@@ -176,7 +176,7 @@ Status: UNINSTALLED
 
 ## Create Helm Chart
 
-- 이번 실습에서는 직접 heml chart를 생성하여 repository에 배포하는 방법에 대해 알아본다.
+- 이번 실습에서는 직접 helm chart를 생성하여 repository에 배포하는 방법에 대해 알아본다.
 
 ※ chart에 대한 상세 Docs는 https://docs.helm.sh/docs/topics/charts/ 를 참조한다.
 
@@ -312,6 +312,121 @@ chart-1596001191-test-chart-7b8cb77597-rc496   1/1     Running       0          
 ```
 
 ![charttest](images/charttest.png)
+
+---
+
+## Chart Customizing (Feature Point)
+
+- helm은 chart를 install하기 전에 chart value값을 변경하여 customizing이 가능하다.
+- 작성한 application을 chart로 만들 때 각종 설정값, domain name, cluster마다 변경되는 환경변수 등을 chart 안에 의존성을 만들지 않고, chart 설치시 외부에서 변경 가능하도록 할수 있는 큰 장점이 있다. (반면에 docker image로 만들어서 가져올땐 하나하나 설정을 바꿔줘야 하는 불편함이 있다.)
+- `helm inspect values` 명령을 사용하여 chart의 어떤 옵션들이 설정 가능한지 확인한 후, yaml file로 해당 설정들을 override할 수 있다.
+
+```bash
+mincloud1501@cloudshell:~ (zipkin-proxy)$ helm inspect values stable/mariadb
+# ... and many more
+image:
+  registry: docker.io
+  repository: bitnami/mariadb
+  tag: 10.3.22-debian-10-r27
+  extraInitContainers: |
+
+  config: |-
+    [mysqld]
+    skip-name-resolve
+    explicit_defaults_for_timestamp
+    basedir=/opt/bitnami/mariadb
+    plugin_dir=/opt/bitnami/mariadb/plugin
+    port=3306
+    socket=/opt/bitnami/mariadb/tmp/mysql.sock
+    tmpdir=/opt/bitnami/mariadb/tmp
+    max_allowed_packet=16M
+    bind-address=0.0.0.0
+    pid-file=/opt/bitnami/mariadb/tmp/mysqld.pid
+    log-error=/opt/bitnami/mariadb/logs/mysqld.log
+    character-set-server=UTF8
+    collation-server=utf8_general_ci
+    initialDelaySeconds: 30
+
+    ## Default Kubernetes values
+    periodSeconds: 10
+    timeoutSeconds: 1
+    successThreshold: 1
+    failureThreshold: 3
+  # Enable this if you're using https://github.com/coreos/prometheus-operator
+  serviceMonitor:
+    enabled: false
+    selector:
+      prometheus: kube-prometheus
+
+tests:
+  enabled: true
+  # resources: {}
+  testFramework:
+    image:
+      registry: docker.io
+      repository: dduportal/bats
+      tag: 0.4.0
+```
+
+- mincloud로 사용자를 만들고, minclouddb로 database를 만들어서 사용자에게 권한을 부여해 준다.
+
+```bash
+mincloud1501@cloudshell:~ (zipkin-proxy)$ echo '{mariadbUser: mincloud, mariadbDatabase: minclouddb}' > config.yaml
+```
+
+- 생성한 `config.yaml`로 install 한다.
+
+```bash
+mincloud1501@cloudshell:~ (zipkin-proxy)$ helm install -f config.yaml stable/mariadb --generate-name
+NAME: mariadb-1596502752
+LAST DEPLOYED: Tue Aug  4 00:59:18 2020
+NAMESPACE: default
+STATUS: deployed
+REVISION: 1
+# ... and many more
+
+mincloud1501@cloudshell:~ (zipkin-proxy)$ helm ls
+NAME                    NAMESPACE       REVISION        UPDATED                                 STATUS          CHART                   APP VERSION
+mariadb-1596502752      default         1               2020-08-04 00:59:18.913798745 +0000 UTC deployed        mariadb-7.3.14          10.3.22
+```
+
+## Chart Upgrade & Rollback
+
+- chart의 신규 version이 있거나, 이미 release한 chart의 설정값을 변경하고자 할 때는 `helm upgrade` 명령으로 수행 가능하다.
+- 
+
+[upgrade.yaml]
+
+```bash
+mariadbUser: user1
+```
+
+```bash
+mincloud1501@cloudshell:~ (zipkin-proxy)$ helm upgrade -f upgrade.yaml mariadb-1596502752 stable/mariadb
+Release "mariadb-1596502752" has been upgraded. Happy Helming!
+NAME: mariadb-1596502752
+LAST DEPLOYED: Tue Aug  4 01:09:16 2020
+NAMESPACE: default
+STATUS: deployed
+REVISION: 2
+# ... and many more
+
+mincloud1501@cloudshell:~ (zipkin-proxy)$ helm get values mariadb-1596502752
+USER-SUPPLIED VALUES:
+mariadbUser: user1
+```
+
+- 만약 release가 잘못 되었을 경우 `helm rollback [RELEASE][REVISION]` 명령으로 rollback 가능하다.
+
+```bash
+mincloud1501@cloudshell:~ (zipkin-proxy)$ helm rollback mariadb-1596502752 1
+Rollback was a success! Happy Helming!
+
+mincloud1501@cloudshell:~ (zipkin-proxy)$ helm get values mariadb-1596502752
+USER-SUPPLIED VALUES:
+mariadbDatabase: minclouddb
+mariadbUser: mincloud
+```
 
 ---
 
