@@ -24,7 +24,7 @@ Kubernetes를 위한 Package Manager인 Helm의 개념 파악 및 실습을 통�
 
 ※ GKE에 대한 자세한 설명은 저의 또 다른 게시물을 참고하세요 (https://github.com/mincloud1501/MSA_miniProject)
 
-※ 이번 실습에서 알아볼 명령 셋은 아래와 같습니다. 우선 기존 생성되어 있는 chart를 repository에서 가져와 설치/업그레이드/배포해 봅니다.
+※ 이번 실습에서 알아볼 명령 셋은 아래와 같습니다. 우선 기존 생성되어 있는 chart를 repository에서 가져와 설치/업그레이드/배포해 봅니다. (Helm v3.2.1)
 
 ```bash
 -----------------------------------------------------------------------------------
@@ -46,9 +46,13 @@ helm repo update                | helm ls
 ### Initialize a Helm Chart Repository
 
 - helm chart repository 목록을 확인하고 새로운 repository를 등록한다. Google helm chart를 가장 많이 사용한다. (https://github.com/helm/charts)
-- stable repository는 helm 설치 시 기본으로 등록된다.
+- Stable Repository는 helm 설치 시 기본으로 등록된다.
+- Helm v3가 2019년 11월 13일에 release되었다. Helm v3는 Helm v2에 비해 여러 가지 장점이 있는데, Helm 서버인 `Tiller가 Helm v3에서 제거`되었으며, 여러 namespace에서 하나의 버전으로 된 동일한 chart를 release할 수 있도록 chart release name의 범위가 namespace로 지정된다.
 
 ```bash
+mincloud1501@cloudshell:~ (zipkin-proxy)$ helm version
+version.BuildInfo{Version:"v3.2.1", GitCommit:"fe51cd1e31e6a202cba7dead9552a6d418ded79a", GitTreeState:"clean", GoVersion:"go1.13.10"}
+
 mincloud1501@cloudshell:~ (zipkin-proxy)$ helm repo add stable https://kubernetes-charts.storage.googleapis.com/
 "stable" has been added to your repositories
 
@@ -81,6 +85,7 @@ Hang tight while we grab the latest from your chart repositories...
 ...Successfully got an update from the "stable" chart repository
 Update Complete. ⎈ Happy Helming!⎈
 
+# Usage: helm install [NAME] [CHART] [flags]
 mincloud1501@cloudshell:~ (zipkin-proxy)$ helm install stable/mysql --generate-name
 NAME: mysql-1595924649
 LAST DEPLOYED: Tue Jul 28 08:24:16 2020
@@ -207,6 +212,7 @@ helm package <chart.yaml directory>
 - `README.md`
 
 ```bash
+# Usage:   helm create NAME [flags]
 mincloud1501@cloudshell:~ (zipkin-proxy)$ helm create test-chart
 Creating test-chart
 
@@ -289,6 +295,7 @@ version: 0.2.0
 - replicaCount를 2로, chart의 version을 0.2.0으로 수정한 후, 변경한 chart로 upgrade시 2개의 Pod가 실행된다.
 
 ```bash
+# Usage: helm upgrade [RELEASE] [CHART] [flags]
 mincloud1501@cloudshell:~/test-chart (zipkin-proxy)$ helm upgrade chart-1596001191 .
 Release "chart-1596001191" has been upgraded. Happy Helming!
 NAME: chart-1596001191
@@ -315,6 +322,7 @@ REVISION        UPDATED                         STATUS          CHART           
 2               Wed Jul 29 05:49:04 2020        deployed        test-chart-0.2.0        1.16.0          Upgrade complete
 
 # 새로 배포된 Release에 문제가 생겨서 이전 버전으로 되돌아 가려면, rollback 명령을 실행하여 돌아갈 수 있다.
+# Usage: helm rollback <RELEASE> [REVISION] [flags]
 mincloud1501@cloudshell:~/test-chart (zipkin-proxy)$ helm rollback chart-1596001191 1
 Rollback was a success! Happy Helming!
 
@@ -335,6 +343,12 @@ chart-1596001191-test-chart-7b8cb77597-rc496   1/1     Running       0          
 - `helm inspect values` 명령을 사용하여 chart의 어떤 옵션들이 설정 가능한지 확인한 후, yaml file로 해당 설정들을 override할 수 있다.
 
 ```bash
+# Usage: helm inspect [command]
+# Available Commands:
+#  all         show all information of the chart
+#  chart       show the chart's definition
+#  readme      show the chart's README
+#  values      show the chart's values
 mincloud1501@cloudshell:~ (zipkin-proxy)$ helm inspect values stable/mariadb
 # ... and many more
 image:
@@ -409,7 +423,6 @@ mariadb-1596502752      default         1               2020-08-04 00:59:18.9137
 ```
 
 ## Chart Upgrade & Rollback
-
 
 - chart의 신규 version이 있거나, 이미 release한 chart의 설정값을 변경하고자 할 때는 `helm upgrade` 명령으로 수행 가능.
 
@@ -564,5 +577,3 @@ NOTES:
 - pre-rollback: resource가 rollback되기 전 template가 렌더링 된 후에 rollback request가 실행된다.
 - post-rollback: 모든 resource가 수정된 후에 rollback request가 실행된다.
 - test: 'helm test' 명령을 실행할 때 수행된다.
-
-TBD...
